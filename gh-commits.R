@@ -2,10 +2,19 @@ library(tidyverse)
 library(gh)
 library(lubridate)
 library(glue)
+library(usethis)
+
+usethis::create_github_token()
+gitcreds::gitcreds_set()
+gh_token_help()
+
+
+# fetch github commits ----------------------------------------------------
 
 repos <- gh("GET /users/{username}/repos", 
-            .token = '',
-            username = "ceenell", .limit = Inf,
+            #.token = '',
+            username = "ceenell", 
+            .limit = Inf,
             sort = "created")
 repos
 
@@ -54,33 +63,86 @@ all_commits <- map_dfr(repo_info$full_name, function(z){
                           owner = owner, 
                           repo = repo, 
                           author = "ceenell",
-                          since = "2012-01-01T00:00:00Z",
-                          until = "2022-11-05T00:00:00Z",
-                          .limit = Inf)
-  repo_commits
+                          since = "2013-01-01T00:00:00Z",
+                          until = "2015-11-05T00:00:00Z",
+                          .limit = Inf, .progress = TRUE)
   out <- parse_commit(repo_commits, repo = z)
   
   return(out)
 })
+
 all_commits
 
-my_commits <- all_commits |> 
-  mutate(commit_time = commit_time - hours(5)) |> 
+my_commits <- all_commits %>% 
+  mutate(commit_time = commit_time - hours(5)) %>% 
   mutate(
     date = date(commit_time),
     wday = wday(date, label = TRUE),
     year = year(date),
+    month = month(date),
     week = week(date)
-  ) |> 
+  ) %>% 
   left_join(
     repo_info, 
     by = c("repo" = "full_name")
   ) 
-my_commits
+my_commits$wday
+my_commits$username %>%unique
+my_commits$name %>% unique # repos committed to
+my_commits$owner %>% unique 
 
-## number of repos created, followed, contribted to, most popular repos
-## number of commits, PRs, iissues, code changed through time
+# create github heatmap ---------------------------------------------------
+
+gh_pal <- c(blue = "#0366d6", yellow = "#ffd33d", red = "#d73a49", green = "#28a745", purple = "#6f42c1", light_green = "#dcffe4")
+
+label_month <- my_commits %>% 
+  group_by(month) %>%
+  summarize(week = min(week)) %>%
+  mutate(month_label = month(month, label = TRUE))
+
+my_commits %>% 
+  group_by(year, month, week, wday) %>% 
+  summarize(n = length(message)) %>%
+  mutate(label_month = ifelse(week %in% label_month$week, month, NA)) %>%
+  ggplot() + 
+  geom_tile(aes(x = week, y = wday, width = 0.9, height = 0.9, fill = n), 
+            #fill = '#39d353'
+            ) + 
+  theme_classic() + 
+  scale_y_discrete(expand = c(0, 0), 
+                    limits = rev(c('Sun','Mon','Tue','Wed','Thu','Fri','Sat'))) + 
+  scale_x_discrete(expand = c(0, 0), 
+                   breaks = label_month$week,
+                   labels = label_month$month_label) + 
+  theme(
+    axis.title = element_blank(),
+    axis.line = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text.y = element_blank(), 
+    axis.text.x = element_text(color = 'red'),
+    panel.grid.minor.x = element_blank(),
+    legend.position = 'none',
+    strip.background = element_rect(color = NA),
+    #strip.text.y = element_text(angle = 0)
+  ) +
+  facet_grid(year~., switch = 'both') +
+  coord_fixed(ratio = 1) + 
+  scale_fill_gradient(low = gh_pal["light_green"], high = gh_pal["green"])
+
+
+## year, week and day with most commits
+my_commits %>% 
+  group_by(year, month, week, wday) %>%
+  summarize(n = length(message)) %>%
+  arrange(desc(n))
+
+## most repos 
+my_commits %>% 
+  group_by(year) %>%
+  summarize(n_repos = length(unique(name))) %>%
+  arrange(desc(n_repos))
+
+## most popular repos
+## number of PRs, issues, code changed through time
 ## network of collaborators
-## common words used in commit messages, commit times
-## nu
-## most use functions? composition of languages?
+## commit messages and issues
