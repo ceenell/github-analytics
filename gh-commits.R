@@ -8,52 +8,37 @@ usethis::create_github_token()
 gitcreds::gitcreds_set()
 gh_token_help()
 
+source('src/fetch_utils.R')
 
-# fetch github commits ----------------------------------------------------
+# fetch github repos for a user ----------------------------------------------------
+
+user <- 'ceenell'
 
 repos <- gh("GET /users/{username}/repos", 
-            #.token = '',
-            username = "ceenell", 
+            username = user, 
             .limit = Inf,
             sort = "created")
-repos
 
-repo_info <- tibble(
-  owner = map_chr(repos, c("owner", "login")),
-  name = map_chr(repos, "name"),
-  full_name = map_chr(repos, "full_name")
-)
-repo_info
+repo_info <- munge_repos(repos)
 
-length(unique(repo_info$full_name)) #165
+write_csv(repo_info, 'out/gh_repos.csv')
 
-## Get and parse commits
-null_list <- function(x){
-  map_chr(x, ~{ifelse(is.null(.x), NA, .x)})
-}
+# get list of contributors for each repo
+## contributors, language
+repo$language
 
-## to extract API responses
-parse_commit <- function(commits, repo){
-  # browser()
-  commit_by <- map(commits, c("commit", "author", "name"))
-  username <- map(commits, c("committer", "login"))
-  commit_time <- map(commits, c("commit", "author", "date"))
-  message <- map(commits, c("commit", "message"))
-  
-  out <- tibble(
-    repo = repo,
-    commit_by = null_list(commit_by),
-    username = null_list(username),
-    commit_time = null_list(commit_time),
-    message = null_list(message)
-  )
-  
-  out <- mutate(out, commit_time = as.POSIXct(commit_time, format = "%Y-%m-%dT%H:%M:%SZ"))
-  return(out)
-}
+# look at user commits ----------------------------------------------------
 
-gh_safe <- purrr::possibly(gh, otherwise = NULL)
 
+## to get repo-specific info need to know the owner
+gh('GET /repos/USGS-R/dataRetrieval/contributors') # contributions
+gh('GET /repos/USGS-R/dataRetrieval/languages') # breakdown 
+gh('GET /repos/USGS-R/dataRetrieval')
+gh('GET /repos/jordansread/dataRetrieval')
+# parent, full_name is the main repo that's forked
+
+
+## fetch all commits by a user
 all_commits <- map_dfr(repo_info$full_name, function(z){
   name_split <- str_split(z, "/")
   owner <- name_split[[1]][1]
@@ -62,10 +47,11 @@ all_commits <- map_dfr(repo_info$full_name, function(z){
   repo_commits <- gh_safe("/repos/:owner/:repo/commits", 
                           owner = owner, 
                           repo = repo, 
-                          author = "ceenell",
-                          since = "2013-01-01T00:00:00Z",
-                          until = "2015-11-05T00:00:00Z",
+                          author = user,
+                          since = "2011-01-01T00:00:00Z",
+                          until = "2022-11-06T00:00:00Z",
                           .limit = Inf, .progress = TRUE)
+  browser()
   out <- parse_commit(repo_commits, repo = z)
   
   return(out)
@@ -86,14 +72,12 @@ my_commits <- all_commits %>%
     repo_info, 
     by = c("repo" = "full_name")
   ) 
-my_commits$wday
-my_commits$username %>%unique
+
 my_commits$name %>% unique # repos committed to
-my_commits$owner %>% unique 
 
 # create github heatmap ---------------------------------------------------
 
-gh_pal <- c(blue = "#0366d6", yellow = "#ffd33d", red = "#d73a49", green = "#28a745", purple = "#6f42c1", light_green = "#dcffe4")
+gh_pal <- c(green = "#28a745",light_green = "#dcffe4")
 
 label_month <- my_commits %>% 
   group_by(month) %>%
