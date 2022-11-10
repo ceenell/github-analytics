@@ -44,4 +44,5 @@ munge_repos <- function(repos){
       repo_info[i, 'parent_repo'] <- get_parent_repo(repo_info$full_name[i])
     }
   }
+  return(repo_info)
 }

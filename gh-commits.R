@@ -12,14 +12,15 @@ source('src/fetch_utils.R')
 
 # fetch github repos for a user ----------------------------------------------------
 
-user <- 'ceenell'
+user <- 'jordansread'
 
 repos <- gh("GET /users/{username}/repos", 
             username = user, 
             .limit = Inf,
             sort = "created")
-
+repos
 repo_info <- munge_repos(repos)
+repo_info
 
 write_csv(repo_info, 'out/gh_repos.csv')
 
@@ -51,7 +52,6 @@ all_commits <- map_dfr(repo_info$full_name, function(z){
                           since = "2011-01-01T00:00:00Z",
                           until = "2022-11-06T00:00:00Z",
                           .limit = Inf, .progress = TRUE)
-  browser()
   out <- parse_commit(repo_commits, repo = z)
   
   return(out)
