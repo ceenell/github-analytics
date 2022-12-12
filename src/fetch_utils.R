@@ -20,9 +20,10 @@ parse_commit <- function(commits, repo){
     commit_time = null_list(commit_time),
     message = null_list(message)
   )
-  
-  out <- mutate(out, commit_time = as.POSIXct(commit_time, format = "%Y-%m-%dT%H:%M:%SZ"))
-  return(out)
+
+  outc <- mutate(out, commit_time = as.POSIXct(commit_time, format = "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"))
+  print(sprintf('%s compared to %s', out$commit_time, outc$commit_time))
+  return(outc)
 }
 
 gh_safe <- purrr::possibly(gh, otherwise = NULL)

@@ -50,17 +50,17 @@ all_commits <- map_dfr(repo_info$full_name, function(z){
                           repo = repo, 
                           author = user,
                           since = "2011-01-01T00:00:00Z",
-                          until = "2022-11-06T00:00:00Z",
+                          until = "2022-12-11T00:00:00Z",
                           .limit = Inf, .progress = TRUE)
   out <- parse_commit(repo_commits, repo = z)
   
   return(out)
 })
 
-all_commits
+all_commits$commit_time
 
 my_commits <- all_commits %>% 
-  mutate(commit_time = commit_time - hours(5)) %>% 
+  mutate(commit_time = with_tz(commit_time, tzone = 'America/Chicago')) %>% 
   mutate(
     date = date(commit_time),
     wday = wday(date, label = TRUE),
@@ -72,8 +72,15 @@ my_commits <- all_commits %>%
     repo_info, 
     by = c("repo" = "full_name")
   ) 
-
+all_commits$commit_time[1]
+my_commits$commit_time[1]
+my_commits$commit_time_test[1]
+my_commits$commit_time_cst[1]
 my_commits$name %>% unique # repos committed to
+my_commits |> write_csv('out/commits_jordansread.csv')
+
+## fixing the time - comapre to known tweet times
+
 
 # create github heatmap ---------------------------------------------------
 
